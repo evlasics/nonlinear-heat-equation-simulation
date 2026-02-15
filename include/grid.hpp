@@ -1,18 +1,19 @@
 #pragma once
-#include <vector>
-using std::vector;
 
-using namespace std;
+#include <vector>
 
 struct Grid {
-	std::vector<double> x;
+    std::vector<double> x;
 
-    void initialize(int Nx, double L){
+    void initialize(int Nx, double L)
+    {
         x.resize(Nx);
-        double dx = 2.0*L/(Nx-1);
-        for(int i=0;i<Nx;i++)
-            x[i] = -L + i*dx;
+        const double dx = 2.0 * L / (Nx - 1);
+
+        for (int i = 0; i < Nx; i++) {
+            x[i] = -L + i * dx;
+        }
     }
 
-    int size() const { return x.size(); }
+    int size() const { return static_cast<int>(x.size()); }
 };

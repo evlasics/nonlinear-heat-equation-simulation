@@ -1,7 +1,7 @@
-// config.h
 #pragma once
-#include "vector.hpp"
+
 #include "grid.hpp"
+#include "vector.hpp"
 
 extern int Nx;
 extern int Ncurves;

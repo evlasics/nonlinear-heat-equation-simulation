@@ -1,11 +1,22 @@
 #include <iostream>
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <iomanip>
-#include <fstream>
 #include <chrono>
 #include <filesystem>
+#include <sstream>
+#include <string>
+#include <vector>
+
 #include "config.hpp"
+
+using std::cout;
+using std::endl;
+using std::max;
+using std::min;
+using std::vector;
 
 // =====================================================
 // PARAMETERS
@@ -20,8 +31,8 @@ std::string out_dir;
 // =====================================================
 
 Vec2 interaction(const Vec2& a, const Vec2& b){
-    Vec2 d = a-b;
-    double r2 = norm2(d) + eps_reg*eps_reg;
+    Vec2 d = a - b;
+    double r2 = norm2(d) + eps_reg * eps_reg;
     return d / r2;
 }
 
@@ -40,7 +51,7 @@ double compute_energy(
         for(int i=1;i<Nx-1;i++){
             double dx = grid.x[i+1]-grid.x[i];
             Vec2 d = (psi[j][i+1]-psi[j][i]) / dx;
-            E += 0.5*(d.x*d.x+d.y*d.y)*dx;
+            E += 0.5 * (d.x * d.x + d.y * d.y) * dx;
         }
     }
 
@@ -48,11 +59,11 @@ double compute_energy(
     for(int k=j+1;k<Ncurves;k++)
     for(int i=0;i<Nx;i++){
         Vec2 diff = psi[j][i]-psi[k][i];
-        double r2 = norm2(diff)+eps_reg*eps_reg;
-        E -= 0.5*log(r2);
+        double r2 = norm2(diff) + eps_reg * eps_reg;
+        E -= 0.5 * std::log(r2);
     }
 
-  return E;
+    return E;
 }
 
 // =====================================================
@@ -65,16 +76,18 @@ Vec2 laplacian(
     int i)
 {
     int Nx = grid.size();
-    if(i==0 || i==Nx-1) return Vec2(0,0);
+    if(i == 0 || i == Nx - 1) {
+        return Vec2(0, 0);
+    }
 
     double dxL = grid.x[i]-grid.x[i-1];
     double dxR = grid.x[i+1]-grid.x[i];
 
     Vec2 term =
         (u[i+1]-u[i])/dxR
-      - (u[i]-u[i-1])/dxL;
+      - (u[i] - u[i-1]) / dxL;
 
-    return term * (2.0/(dxL+dxR));
+    return term * (2.0 / (dxL + dxR));
 }
 
 // =====================================================
@@ -92,18 +105,20 @@ void compute_residual(
     for(int j=0;j<Ncurves;j++)
     for(int i=0;i<Nx;i++){
 
-        Vec2 diff = (psi_new[j][i]-psi_old[j][i])*(1.0/dt);
+        Vec2 diff = (psi_new[j][i] - psi_old[j][i]) * (1.0 / dt);
 
         Vec2 lap = (laplacian(psi_new[j],grid,i)
-                   +laplacian(psi_old[j],grid,i))*0.5;
+                   + laplacian(psi_old[j],grid,i)) * 0.5;
 
-        Vec2 force(0,0);
+        Vec2 force(0, 0);
         for(int k=0;k<Ncurves;k++){
-            if(k==j) continue;
+            if(k==j) {
+                continue;
+            }
             force = force + interaction(psi_new[j][i],psi_new[k][i])
                             + interaction(psi_old[j][i],psi_old[k][i]);
         }
-        force = force*0.5;
+        force = force * 0.5;
 
         R[j][i] = diff - lap - force;
     }
@@ -130,15 +145,17 @@ bool newton_step(
         double maxR = 0.0;
         for(int j=0;j<Ncurves;j++)
         for(int i=0;i<Nx;i++){
-            maxR = max(maxR, sqrt(norm2(R[j][i])));
+            maxR = max(maxR, std::sqrt(norm2(R[j][i])));
         }
 
-        if(maxR < tol_newton) return true;
+        if(maxR < tol_newton) {
+            return true;
+        }
 
         // Diagonal update (robust but not fast)
         for(int j=0;j<Ncurves;j++)
         for(int i=0;i<Nx;i++){
-            psi[j][i] = psi[j][i] - R[j][i]*dt;
+            psi[j][i] = psi[j][i] - R[j][i] * dt;
         }
     }
 
@@ -175,11 +192,11 @@ void refine_mesh(
 
         if(indicator > 0.5){  // refinement threshold
 
-            double xm = 0.5*(grid.x[i]+grid.x[i+1]);
+            double xm = 0.5 * (grid.x[i] + grid.x[i + 1]);
             new_x.push_back(xm);
 
             for(int j=0;j<Ncurves;j++){
-                Vec2 mid = (psi[j][i]+psi[j][i+1])*0.5;
+                Vec2 mid = (psi[j][i] + psi[j][i + 1]) * 0.5;
                 new_psi[j].push_back(mid);
             }
         }
@@ -224,8 +241,8 @@ void write_vtp(
     int total_points = Ncurves * Nx;
 
     char filename[256];
-		std::string path = out_dir + "frame_%04d.vtp";
-    sprintf(filename, path.c_str(), frame);
+    std::string path = out_dir + "frame_%04d.vtp";
+    std::snprintf(filename, sizeof(filename), path.c_str(), frame);
 
     std::ofstream file(filename);
 
@@ -289,26 +306,28 @@ class PVDWriter
     bool initialized = false;
 
 public:
-		void initialize()
-		{
-				file.open(out_dir + "solution.pvd");
-				file << "<?xml version=\"1.0\"?>\n";
-				file << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-				file << "  <Collection>\n";
-				initialized = true;
-		}
+    void initialize()
+    {
+        file.open(out_dir + "solution.pvd");
+        file << "<?xml version=\"1.0\"?>\n";
+        file << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+        file << "  <Collection>\n";
+        initialized = true;
+    }
 
-		void append(int frame, double time)
-		{
-				if(!initialized) initialize();
+    void append(int frame, double time)
+    {
+        if (!initialized) {
+            initialize();
+        }
 
-				file << "    <DataSet timestep=\""
-						 << std::setprecision(16)
-						 << time
-						 << "\" group=\"\" part=\"0\" file=\"frame_"
-						 << std::setw(4) << std::setfill('0') << frame
-						 << ".vtp\"/>\n";
-		}
+        file << "    <DataSet timestep=\""
+             << std::setprecision(16)
+             << time
+             << "\" group=\"\" part=\"0\" file=\"frame_"
+             << std::setw(4) << std::setfill('0') << frame
+             << ".vtp\"/>\n";
+    }
 
 
 
@@ -327,8 +346,8 @@ public:
 // =====================================================
 
 int main(){
-		PVDWriter pvd;
-		int frame = 0;
+    PVDWriter pvd;
+    int frame = 0;
 
     Grid grid;
     grid.initialize(Nx, L);
@@ -336,10 +355,9 @@ int main(){
     vector<vector<Vec2>> psi(Ncurves,
                              vector<Vec2>(Nx));
 
-		initialize_curves(psi, grid);
+    initialize_curves(psi, grid);
 
-		out_dir = make_run_directory();
-		
+    out_dir = make_run_directory();
 
     double t = 0.0;
 
@@ -354,7 +372,7 @@ int main(){
         if(!ok){
             dt *= 0.5;
             if(dt < dt_min){
-                cout<<"Time step underflow.\n";
+                cout << "Time step underflow.\n";
                 break;
             }
             continue;
@@ -365,7 +383,7 @@ int main(){
         for(int j=0;j<Ncurves;j++)
         for(int i=0;i<grid.size();i++)
             err = max(err,
-                      sqrt(norm2(psi_trial[j][i]
+                      std::sqrt(norm2(psi_trial[j][i]
                            -psi_old[j][i])));
 
         if(err > tol_time){
@@ -376,37 +394,36 @@ int main(){
         psi = psi_trial;
         t += dt;
 
-				if(frame % 100 == 0)
-				{
-					write_vtp(psi, grid, frame);
-					pvd.append(frame, t);
+        if(frame % 100 == 0)
+        {
+            write_vtp(psi, grid, frame);
+            pvd.append(frame, t);
 
-					if (frame % 1000 == 0)
-					{
-						double E = compute_energy(psi,grid);
-		
-						cout<<"t="<<t
-								<<"  dt="<<dt
-								<<"  Nx="<<grid.size()
-								<<"  Energy="<<E
-								<<endl;
-					}
-				}
-				frame++;
+            if (frame % 1000 == 0)
+            {
+                double E = compute_energy(psi,grid);
+
+                cout << "t=" << t
+                     << "  dt=" << dt
+                     << "  Nx=" << grid.size()
+                     << "  Energy=" << E
+                     << endl;
+            }
+        }
+        frame++;
 
 
         if(err < tol_time*0.1)
             dt = min(dt*1.2, dt_max);
 
-				if(frame % 10 == 0)
-			    refine_mesh(grid, psi);
+        if(frame % 10 == 0)
+            refine_mesh(grid, psi);
 
         refine_mesh(grid,psi);
 
     }
 
-		pvd.finalize();
+    pvd.finalize();
 
-    cout<<"Finished.\n";
+    cout << "Finished.\n";
 }
-
