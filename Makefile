@@ -44,6 +44,30 @@ run: all
 	@mkdir -p output
 	./$(TARGET)
 
+
+# ============================================
+# SAVE LATEST OUTPUT SNAPSHOT
+# Usage: make save <name>
+# ============================================
+
+save:
+	@name="$(word 2,$(MAKECMDGOALS))"; \
+	if [ -z "$$name" ]; then \
+		echo "Usage: make save <name>"; \
+		exit 1; \
+	fi; \
+	if [ ! -d output/latest ]; then \
+		echo "No latest output found. Run 'make run' first."; \
+		exit 1; \
+	fi; \
+	mkdir -p output/saved; \
+	rm -rf "output/saved/$$name"; \
+	cp -r output/latest "output/saved/$$name"; \
+	echo "Saved latest output to output/saved/$$name"
+
+%:
+	@:
+
 # ============================================
 # CLEAN OUTPUT
 # ============================================

@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
-#include <chrono>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -215,18 +214,33 @@ void refine_mesh(
 // CREATE OUTPUT DIRECTORY
 // =====================================================
 
-std::string make_run_directory() {
-    using namespace std::chrono;
+void clear_run_outputs(const std::string& dir)
+{
+    if (!std::filesystem::exists(dir)) {
+        return;
+    }
 
-    auto now = system_clock::now();
-    auto t = system_clock::to_time_t(now);
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+        if (!entry.is_regular_file()) {
+            continue;
+        }
 
-    std::stringstream ss;
-    ss << "output/run_" << std::put_time(std::localtime(&t), "%Y_%m_%d_%H_%M_%S") << "/";
+        const auto name = entry.path().filename().string();
+        const bool is_frame =
+            name.rfind("frame_", 0) == 0 && entry.path().extension() == ".vtp";
 
-    std::filesystem::create_directories(ss.str());
+        if (is_frame || name == "solution.pvd") {
+            std::filesystem::remove(entry.path());
+        }
+    }
+}
 
-    return ss.str();
+std::string make_run_directory()
+{
+    const std::string dir = "output/latest/";
+    std::filesystem::create_directories(dir);
+    clear_run_outputs(dir);
+    return dir;
 }
 
 // =====================================================
