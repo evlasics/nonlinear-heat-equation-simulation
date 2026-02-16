@@ -7,28 +7,28 @@ namespace {
 
 double max_residual_norm(const CurveSet& residual)
 {
-    double max_norm = 0.0;
+    double max_norm2 = 0.0;
 
     for (const auto& curve : residual) {
         for (const auto& value : curve) {
-            max_norm = std::max(max_norm, std::sqrt(norm2(value)));
+            max_norm2 = std::max(max_norm2, norm2(value));
         }
     }
 
-    return max_norm;
+    return std::sqrt(max_norm2);
 }
 
 double compute_step_error(const CurveSet& next, const CurveSet& previous)
 {
-    double error = 0.0;
+    double error2 = 0.0;
 
     for (int curve = 0; curve < Ncurves; ++curve) {
         for (int index = 0; index < static_cast<int>(next[curve].size()); ++index) {
-            error = std::max(error, std::sqrt(norm2(next[curve][index] - previous[curve][index])));
+            error2 = std::max(error2, norm2(next[curve][index] - previous[curve][index]));
         }
     }
 
-    return error;
+    return std::sqrt(error2);
 }
 
 } // namespace

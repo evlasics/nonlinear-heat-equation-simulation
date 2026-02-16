@@ -2,6 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 Vec2 interaction(const Vec2& a, const Vec2& b)
 {
@@ -31,6 +36,7 @@ double compute_energy(const CurveSet& psi, const Grid& grid)
     const int point_count = grid.size();
     double energy = 0.0;
 
+#pragma omp parallel for reduction(+ : energy) if (point_count > 128)
     for (int curve = 0; curve < Ncurves; ++curve) {
         for (int index = 1; index < point_count - 1; ++index) {
             const double dx = grid.x[index + 1] - grid.x[index];
@@ -39,6 +45,7 @@ double compute_energy(const CurveSet& psi, const Grid& grid)
         }
     }
 
+#pragma omp parallel for reduction(+ : energy) if (point_count > 128)
     for (int curve_a = 0; curve_a < Ncurves; ++curve_a) {
         for (int curve_b = curve_a + 1; curve_b < Ncurves; ++curve_b) {
             for (int index = 0; index < point_count; ++index) {
@@ -61,25 +68,39 @@ void compute_residual(
 {
     const int point_count = grid.size();
 
+#pragma omp parallel for if (point_count > 128)
     for (int curve = 0; curve < Ncurves; ++curve) {
-        for (int index = 0; index < point_count; ++index) {
+        residual[curve][0] = (psi_new[curve][0] - psi_old[curve][0]) * (1.0 / dt);
+        for (int index = 1; index < point_count - 1; ++index) {
             const Vec2 temporal = (psi_new[curve][index] - psi_old[curve][index]) * (1.0 / dt);
-
             const Vec2 diffusion =
                 (laplacian(psi_new[curve], grid, index) + laplacian(psi_old[curve], grid, index)) *
                 0.5;
+            residual[curve][index] = temporal - diffusion;
+        }
+        if (point_count > 1) {
+            residual[curve][point_count - 1] =
+                (psi_new[curve][point_count - 1] - psi_old[curve][point_count - 1]) * (1.0 / dt);
+        }
+    }
 
-            Vec2 force(0.0, 0.0);
-            for (int other = 0; other < Ncurves; ++other) {
-                if (other == curve) {
-                    continue;
-                }
+#pragma omp parallel for if (point_count > 128)
+    for (int index = 0; index < point_count; ++index) {
+        std::vector<Vec2> force(Ncurves, Vec2(0.0, 0.0));
 
-                force = force + interaction(psi_new[curve][index], psi_new[other][index]) +
-                        interaction(psi_old[curve][index], psi_old[other][index]);
+        for (int curve_a = 0; curve_a < Ncurves; ++curve_a) {
+            for (int curve_b = curve_a + 1; curve_b < Ncurves; ++curve_b) {
+                const Vec2 new_force = interaction(psi_new[curve_a][index], psi_new[curve_b][index]);
+                const Vec2 old_force = interaction(psi_old[curve_a][index], psi_old[curve_b][index]);
+                const Vec2 pair_force = new_force + old_force;
+
+                force[curve_a] = force[curve_a] + pair_force;
+                force[curve_b] = force[curve_b] - pair_force;
             }
+        }
 
-            residual[curve][index] = temporal - diffusion - force * 0.5;
+        for (int curve = 0; curve < Ncurves; ++curve) {
+            residual[curve][index] = residual[curve][index] - force[curve] * 0.5;
         }
     }
 }
