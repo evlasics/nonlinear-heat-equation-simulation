@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cmath>
 
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
+
 Vec2 interaction(const Vec2& a, const Vec2& b)
 {
     const Vec2 delta = a - b;
@@ -31,6 +35,9 @@ double compute_energy(const CurveSet& psi, const Grid& grid)
     const int point_count = grid.size();
     double energy = 0.0;
 
+#ifdef USE_OPENMP
+#pragma omp parallel for reduction(+ : energy)
+#endif
     for (int curve = 0; curve < Ncurves; ++curve) {
         for (int index = 1; index < point_count - 1; ++index) {
             const double dx = grid.x[index + 1] - grid.x[index];
@@ -62,6 +69,9 @@ void compute_residual(
     const int point_count = grid.size();
     const double inv_dt = 1.0 / dt;
 
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
     for (int curve = 0; curve < Ncurves; ++curve) {
         for (int index = 0; index < point_count; ++index) {
             const Vec2 temporal = (psi_new[curve][index] - psi_old[curve][index]) * inv_dt;
