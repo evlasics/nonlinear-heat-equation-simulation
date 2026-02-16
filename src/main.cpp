@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <limits>
 
 #include "config.hpp"
 
@@ -240,6 +241,33 @@ void write_vtp(
     int Nx = grid.size();
     int total_points = Ncurves * Nx;
 
+    vector<vector<Vec2>> second_derivative(
+        Ncurves,
+        vector<Vec2>(Nx, Vec2(0, 0)));
+    vector<vector<double>> distance_to_other_curve(
+        Ncurves,
+        vector<double>(Nx, 0.0));
+
+    for (int j = 0; j < Ncurves; j++) {
+        for (int i = 0; i < Nx; i++) {
+            second_derivative[j][i] = laplacian(psi[j], grid, i);
+
+            double min_dist = std::numeric_limits<double>::max();
+            for (int k = 0; k < Ncurves; k++) {
+                if (k == j) {
+                    continue;
+                }
+
+                Vec2 d = psi[j][i] - psi[k][i];
+                min_dist = min(min_dist, std::sqrt(norm2(d)));
+            }
+
+            if (min_dist < std::numeric_limits<double>::max()) {
+                distance_to_other_curve[j][i] = min_dist;
+            }
+        }
+    }
+
     char filename[256];
     std::string path = out_dir + "frame_%04d.vtp";
     std::snprintf(filename, sizeof(filename), path.c_str(), frame);
@@ -292,6 +320,36 @@ void write_vtp(
     file << "        </DataArray>\n";
 
     file << "      </Lines>\n";
+
+    // ---- Point data for ParaView ----
+    file << "      <PointData Scalars=\"distance_to_other_curve second_derivative_magnitude\">\n";
+
+    file << "        <DataArray type=\"Float64\" Name=\"second_derivative\" NumberOfComponents=\"3\" format=\"ascii\">\n";
+    for (int j = 0; j < Ncurves; j++) {
+        for (int i = 0; i < Nx; i++) {
+            const Vec2& d2 = second_derivative[j][i];
+            file << d2.x << " " << d2.y << " 0\n";
+        }
+    }
+    file << "        </DataArray>\n";
+
+    file << "        <DataArray type=\"Float64\" Name=\"second_derivative_magnitude\" format=\"ascii\">\n";
+    for (int j = 0; j < Ncurves; j++) {
+        for (int i = 0; i < Nx; i++) {
+            file << std::sqrt(norm2(second_derivative[j][i])) << "\n";
+        }
+    }
+    file << "        </DataArray>\n";
+
+    file << "        <DataArray type=\"Float64\" Name=\"distance_to_other_curve\" format=\"ascii\">\n";
+    for (int j = 0; j < Ncurves; j++) {
+        for (int i = 0; i < Nx; i++) {
+            file << distance_to_other_curve[j][i] << "\n";
+        }
+    }
+    file << "        </DataArray>\n";
+
+    file << "      </PointData>\n";
 
     file << "    </Piece>\n";
     file << "  </PolyData>\n";
