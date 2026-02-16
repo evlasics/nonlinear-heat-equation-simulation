@@ -3,7 +3,7 @@
 # ============================================
 
 CXX = g++
-CXXFLAGS = -std=c++17 -O3 -march=native -ffast-math -DNDEBUG -fopenmp -Iinclude
+CXXFLAGS = -std=c++17 -O3 -march=native -ffast-math -DNDEBUG -Iinclude
 
 SRC_DIR = src
 BUILD_DIR = build
