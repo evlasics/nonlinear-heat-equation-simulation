@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
+#include <chrono>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -241,6 +242,40 @@ std::string make_run_directory()
     std::filesystem::create_directories(dir);
     clear_run_outputs(dir);
     return dir;
+}
+
+
+std::string make_archive_directory()
+{
+    using namespace std::chrono;
+
+    const auto now = system_clock::now();
+    const auto t = system_clock::to_time_t(now);
+    const auto millis = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+
+    std::ostringstream name;
+    name << "output/archive/run_"
+         << std::put_time(std::localtime(&t), "%Y_%m_%d_%H_%M_%S")
+         << '_' << std::setw(3) << std::setfill('0') << millis.count();
+
+    std::filesystem::create_directories(name.str());
+    return name.str() + "/";
+}
+
+void archive_latest_run()
+{
+    const std::filesystem::path latest_dir("output/latest");
+    if (!std::filesystem::exists(latest_dir)) {
+        return;
+    }
+
+    const std::filesystem::path archive_dir = make_archive_directory();
+
+    std::filesystem::copy(
+        latest_dir,
+        archive_dir,
+        std::filesystem::copy_options::recursive |
+        std::filesystem::copy_options::overwrite_existing);
 }
 
 // =====================================================
@@ -496,6 +531,7 @@ int main(){
     }
 
     pvd.finalize();
+    archive_latest_run();
 
     cout << "Finished.\n";
 }
